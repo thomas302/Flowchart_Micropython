@@ -7,7 +7,6 @@ This was created largely through the use of AI.  If development continues it wil
 At some point a may attempt a clean rewrite sans AI and with a more sensible code layout (instead of a single massive html/js/css file).
 
 ## Future work   
-1) make loops more intuitive
-	double clicking a loop opens up a tab like a function
-	This tab cant be actual funtcion, it just needs the same canvas to create on
-	Remove the loop path node, just have the exit node
+1) build out the library and init for the app
+2) integrate with some type of deploy system
+
