@@ -23,8 +23,6 @@
   .tab:hover{background:var(--surface2);color:var(--text)}
   .tab.active{background:var(--surface2);color:var(--accent)}
   .tab.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--accent)}
-  .tab.loop-tab.active{color:var(--accent4)}
-  .tab.loop-tab.active::after{background:var(--accent4)}
   .tab .tab-close{margin-left:4px;opacity:0;font-size:14px;line-height:1;color:var(--text3);transition:opacity .1s,color .1s}
   .tab:hover .tab-close{opacity:1}
   .tab .tab-close:hover{color:var(--accent3)}
@@ -55,17 +53,6 @@
   /* CANVAS */
   #canvas-wrap{flex:1;position:relative;overflow:hidden;background:var(--bg);background-image:radial-gradient(circle at 1px 1px,var(--border) 1px,transparent 0);background-size:24px 24px}
   #main-canvas{position:absolute;top:0;left:0;cursor:default}
-  /* Loop context banner */
-  #loop-context-bar{
-    display:none;position:absolute;top:0;left:0;right:0;z-index:9;
-    padding:7px 16px;
-    background:linear-gradient(90deg,rgba(255,200,90,0.10) 0%,rgba(255,200,90,0.04) 100%);
-    border-bottom:1px solid rgba(255,200,90,0.25);
-    font-family:'Syne',sans-serif;font-size:11px;font-weight:600;
-    color:var(--accent4);pointer-events:none;
-    display:flex;align-items:center;gap:8px;
-  }
-  #loop-context-bar .lcb-icon{font-size:14px;opacity:.7}
   #canvas-tools{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px;z-index:10}
   .ctool{width:28px;height:28px;border-radius:5px;border:none;background:transparent;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .15s}
   .ctool:hover{background:var(--surface2);color:var(--text)}
@@ -90,9 +77,6 @@
   .add-var-btn{width:100%;padding:6px;border-radius:6px;border:1px dashed var(--border2);background:transparent;color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;margin-top:2px}
   .add-var-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(74,240,176,.04)}
   .sidebar-divider{height:1px;background:var(--border);margin:10px 0}
-  /* Loop hint box in sidebar */
-  .loop-hint{margin:8px 0;padding:10px;border-radius:6px;border:1px solid rgba(255,200,90,0.2);background:rgba(255,200,90,0.05);font-size:10px;color:var(--accent4);line-height:1.6}
-  .loop-hint strong{display:block;margin-bottom:4px;font-family:'Syne',sans-serif;font-size:9px;letter-spacing:.1em;text-transform:uppercase}
   /* MODALS */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
   .modal-overlay.show{opacity:1;pointer-events:all}
@@ -114,9 +98,6 @@
   .ctx-item:hover{background:var(--surface3);color:var(--text)}
   .ctx-item.danger:hover{background:rgba(255,107,107,.1);color:var(--accent3)}
   .ctx-divider{height:1px;background:var(--border);margin:3px 0}
-  /* "Open loop" ctx item */
-  .ctx-item.loop-action{color:var(--accent4)}
-  .ctx-item.loop-action:hover{background:rgba(255,200,90,0.1);color:var(--accent4)}
   ::-webkit-scrollbar{width:5px;height:5px}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 </style>
@@ -139,11 +120,6 @@
     <div id="palette-scroll"></div>
   </div>
   <div id="canvas-wrap">
-    <!-- Loop context banner -->
-    <div id="loop-context-bar">
-      <span class="lcb-icon">⟳</span>
-      <span id="loop-context-label">Loop body</span>
-    </div>
     <div id="canvas-tools">
       <button class="ctool active" id="tool-select" title="Select">↖</button>
       <button class="ctool" id="tool-pan" title="Pan">✥</button>
@@ -156,18 +132,12 @@
     <canvas id="main-canvas"></canvas>
   </div>
   <div id="sidebar">
-    <div id="sidebar-header"><span id="sidebar-title">Variables</span></div>
+    <div id="sidebar-header"><span>Variables</span></div>
     <div id="sidebar-scroll">
       <div id="global-vars-section">
         <div class="var-section-title">Global</div>
         <div id="global-var-list"></div>
         <button class="add-var-btn" id="btn-add-global">+ Add Global</button>
-      </div>
-      <div id="loop-hint-section" style="display:none">
-        <div class="loop-hint">
-          <strong>Loop body canvas</strong>
-          Connect <em>LOOP START</em> → your blocks → <em>LOOP END</em>. Use BREAK to exit early.
-        </div>
       </div>
       <div id="fn-vars-section" style="display:none">
         <div class="sidebar-divider"></div>
@@ -189,8 +159,6 @@
 
 <!-- CTX MENU -->
 <div id="ctx-menu">
-  <div class="ctx-item loop-action" id="ctx-open-loop" style="display:none">⟳ Open Loop Body</div>
-  <div class="ctx-divider" id="ctx-loop-divider" style="display:none"></div>
   <div class="ctx-item" id="ctx-edit">✏️ Edit Block</div>
   <div class="ctx-item" id="ctx-dup">⧉ Duplicate</div>
   <div class="ctx-divider"></div>
@@ -266,17 +234,27 @@ const state = {
 
 /* ══════════════════════════════════════
    BLOCK DEFINITIONS
+   
+   Block geometry system:
+   - Flow ports: circles on top (flowIn) and bottom (flowOut / flowExtra_N)
+   - Data IN ports: squares on the LEFT EDGE, evenly spaced vertically
+   - Data OUT ports: squares on the RIGHT EDGE, evenly spaced vertically
+   
+   Compact blocks (value/data/op): BH = 36px, BW = 140px
+   Normal blocks: BH = 46 + fields*18 + extraFlows*18
 ══════════════════════════════════════ */
 
-const BW_NORMAL  = 170;
-const BW_COMPACT = 80;
+// Block width constants
+const BW_NORMAL  = 170;  // flow/control/misc/func blocks
+const BW_COMPACT = 80;   // value, op, data blocks — intentionally narrow
 const BH_NORMAL  = 46;
 const BH_COMPACT = 32;
 const PORT_R     = 6;
 const FLOW_R     = 7;
-const PORT_SPACING = 18;
-const PORT_MARGIN  = 10;
+const PORT_SPACING = 18; // px between data ports vertically
+const PORT_MARGIN  = 10; // px from top/bottom before first port
 
+// Operator symbol map  (key → [symbol, display like "a OP b"])
 const OP_SYMS = {
   op_add:'+', op_sub:'−', op_mul:'×', op_div:'÷', op_mod:'%',
   op_eq:'==', op_neq:'!=', op_lt:'<', op_gt:'>', op_and:'and', op_or:'or', op_not:'not'
@@ -284,22 +262,19 @@ const OP_SYMS = {
 
 const BLOCK_DEFS = {
   // FLOW
-  start:      { label:'START',      color:'#4af0b0', cat:'flow',    compact:false, flowIn:false, flowOut:true,  extraFlows:[], ports:{in:[],out:[]}, fields:[] },
-  end_main:   { label:'END',        color:'#4af0b0', cat:'flow',    compact:false, flowIn:true,  flowOut:false, extraFlows:[], ports:{in:[],out:[]}, fields:[] },
-  comment:    { label:'Comment',    color:'#5a6478', cat:'flow',    compact:false, flowIn:false, flowOut:false, extraFlows:[], ports:{in:[],out:[]}, fields:[{k:'text',label:'Text',default:'comment'}] },
-  // CONTROL — no more extraFlows on loops
-  if_block:   { label:'IF',         color:'#ffc85a', cat:'control', compact:false, flowIn:true,  flowOut:true,  extraFlows:['false'], ports:{in:[{l:'cond'}],out:[]}, fields:[] },
-  for_loop:   { label:'FOR',        color:'#ffc85a', cat:'control', compact:false, flowIn:true,  flowOut:true,  extraFlows:[],        ports:{in:[{l:'iter'}],out:[]}, fields:[{k:'var',label:'Var',default:'i'}] },
-  while_loop: { label:'WHILE',      color:'#ffc85a', cat:'control', compact:false, flowIn:true,  flowOut:true,  extraFlows:[],        ports:{in:[{l:'cond'}],out:[]}, fields:[] },
-  break_blk:  { label:'BREAK',      color:'#ff6b6b', cat:'control', compact:false, flowIn:true,  flowOut:false, extraFlows:[], ports:{in:[],out:[]}, fields:[] },
-  // LOOP BODY anchors — only appear inside loop tabs
-  loop_start: { label:'LOOP START', color:'#ffc85a', cat:'loop',    compact:false, flowIn:false, flowOut:true,  extraFlows:[], ports:{in:[],out:[]}, fields:[] },
-  loop_end:   { label:'LOOP END',   color:'#ffc85a', cat:'loop',    compact:false, flowIn:true,  flowOut:false, extraFlows:[], ports:{in:[],out:[]}, fields:[] },
-  // VALUES
+  start:      { label:'START',   color:'#4af0b0', cat:'flow',    compact:false, flowIn:false, flowOut:true,  extraFlows:[], ports:{in:[],out:[]}, fields:[] },
+  end_main:   { label:'END',     color:'#4af0b0', cat:'flow',    compact:false, flowIn:true,  flowOut:false, extraFlows:[], ports:{in:[],out:[]}, fields:[] },
+  comment:    { label:'Comment', color:'#5a6478', cat:'flow',    compact:false, flowIn:false, flowOut:false, extraFlows:[], ports:{in:[],out:[]}, fields:[{k:'text',label:'Text',default:'comment'}] },
+  // CONTROL
+  if_block:   { label:'IF',      color:'#ffc85a', cat:'control', compact:false, flowIn:true,  flowOut:true,  extraFlows:['false'], ports:{in:[{l:'cond'}],out:[]}, fields:[] },
+  for_loop:   { label:'FOR',     color:'#ffc85a', cat:'control', compact:false, flowIn:true,  flowOut:true,  extraFlows:['exit'],  ports:{in:[{l:'iter'}],out:[]}, fields:[{k:'var',label:'Var',default:'i'}] },
+  while_loop: { label:'WHILE',   color:'#ffc85a', cat:'control', compact:false, flowIn:true,  flowOut:true,  extraFlows:['exit'],  ports:{in:[{l:'cond'}],out:[]}, fields:[] },
+  break_blk:  { label:'BREAK',   color:'#ff6b6b', cat:'control', compact:false, flowIn:true,  flowOut:false, extraFlows:[], ports:{in:[],out:[]}, fields:[] },
+  // VALUES — compact, no flow, just data nodes
   read_var:   { label:'Read',    color:'#c97bff', cat:'value',   compact:true,  flowIn:false, flowOut:false, extraFlows:[], ports:{in:[],out:[{l:'val'}]}, fields:[{k:'name',label:'Var',default:'x',type:'var'}] },
   set_var:    { label:'Set',     color:'#c97bff', cat:'value',   compact:false, flowIn:true,  flowOut:true,  extraFlows:[], ports:{in:[{l:'val'}],out:[]}, fields:[{k:'name',label:'Var',default:'x',type:'var'}] },
   data_blk:   { label:'Data',    color:'#c97bff', cat:'value',   compact:true,  flowIn:false, flowOut:false, extraFlows:[], ports:{in:[],out:[{l:'val'}]}, fields:[{k:'value',label:'Val',default:'0'}] },
-  // OPERATORS
+  // OPERATORS — compact, no flow; a/b are editable literal fallbacks
   op_add:     { label:'+',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
   op_sub:     { label:'−',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
   op_mul:     { label:'×',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
@@ -316,7 +291,7 @@ const BLOCK_DEFS = {
   delay:      { label:'Delay',   color:'#ff9f43', cat:'misc',    compact:false, flowIn:true,  flowOut:true,  extraFlows:[], ports:{in:[{l:'ms'}],out:[]}, fields:[{k:'ms',label:'ms',default:'1000'}] },
   print_blk:  { label:'Print',   color:'#ff9f43', cat:'misc',    compact:false, flowIn:true,  flowOut:true,  extraFlows:[], ports:{in:[{l:'val'}],out:[]}, fields:[] },
   ret_block:  { label:'Return',  color:'#ff6b6b', cat:'func',    compact:false, flowIn:true,  flowOut:false, extraFlows:[], ports:{in:[],out:[]}, fields:[] },
-  // LISTS
+  // LISTS — mux/demux (tuple pack/unpack) + list mutation blocks
   mux:        { label:'Pack',    color:'#4af0ff', cat:'list', compact:false, flowIn:false, flowOut:false, extraFlows:[], ports:{in:[],out:[{l:'tuple'}]},        fields:[{k:'n',label:'Items',default:'2',type:'count'}] },
   demux:      { label:'Unpack',  color:'#4af0ff', cat:'list', compact:false, flowIn:false, flowOut:false, extraFlows:[], ports:{in:[{l:'tuple'}],out:[]},        fields:[{k:'n',label:'Items',default:'2',type:'count'}] },
   list_new:   { label:'New List',color:'#4af0ff', cat:'list', compact:false, flowIn:true,  flowOut:true,  extraFlows:[], ports:{in:[],out:[]},                   fields:[{k:'name',label:'Var',default:'lst',type:'var'}] },
@@ -329,14 +304,13 @@ const BLOCK_DEFS = {
 };
 
 const PALETTE_GROUPS = [
-  { title:'Flow',      types:['start','end_main','comment'] },
-  { title:'Control',   types:['if_block','for_loop','while_loop','break_blk'] },
-  { title:'Values',    types:['read_var','set_var','data_blk'] },
-  { title:'Operators', types:['op_add','op_sub','op_mul','op_div','op_mod','op_eq','op_neq','op_lt','op_gt','op_and','op_or','op_not'] },
-  { title:'Misc',      types:['delay','print_blk'] },
-  { title:'Functions', types:['ret_block'] },
-  { title:'Loop Body', types:['loop_start','loop_end','break_blk'] },  // shown only in loop tabs
-  { title:'Lists',     types:['mux','demux','list_new','list_append','list_insert','list_del','list_del_end','list_get','list_len'] },
+  { title:'Flow',     types:['start','end_main','comment'] },
+  { title:'Control',  types:['if_block','for_loop','while_loop','break_blk'] },
+  { title:'Values',   types:['read_var','set_var','data_blk'] },
+  { title:'Operators',types:['op_add','op_sub','op_mul','op_div','op_mod','op_eq','op_neq','op_lt','op_gt','op_and','op_or','op_not'] },
+  { title:'Misc',     types:['delay','print_blk'] },
+  { title:'Functions',types:['ret_block'] },
+  { title:'Lists',    types:['mux','demux','list_new','list_append','list_insert','list_del','list_del_end','list_get','list_len'] },
 ];
 
 /* ══════════════════════════════════════
@@ -362,6 +336,9 @@ function activeConns() { return activeTab()?.connections||[]; }
 
 /* ══════════════════════════════════════
    BLOCK GEOMETRY
+   
+   Key insight: data ports sit exactly on the left/right EDGES of the block.
+   Their Y position is computed from the content area only (between flow ports).
 ══════════════════════════════════════ */
 function getBlockDef(type) {
   return BLOCK_DEFS[type]
@@ -370,6 +347,7 @@ function getBlockDef(type) {
 }
 
 function blockSize(b) {
+  // Mux/demux: dynamically add ports based on n field
   if(b.type==='mux'||b.type==='demux'){
     const n=Math.max(2,parseInt(b.data?.n||2));
     const def2=Object.assign({},getBlockDef(b.type));
@@ -384,16 +362,31 @@ function blockSize(b) {
   const bw = def.compact ? BW_COMPACT : BW_NORMAL;
   let bh;
   if (def.compact) {
+    // compact: just tall enough for the data ports
     const maxPorts = Math.max((def.ports.in||[]).length, (def.ports.out||[]).length, 1);
     bh = Math.max(BH_COMPACT, PORT_MARGIN*2 + maxPorts * PORT_SPACING);
   } else {
     bh = BH_NORMAL + (def.fields||[]).length * 18 + (def.extraFlows||[]).length * 18;
+    // also needs to fit data ports
     const maxPorts = Math.max((def.ports.in||[]).length, (def.ports.out||[]).length, 0);
     if (maxPorts > 0) bh = Math.max(bh, PORT_MARGIN*2 + maxPorts * PORT_SPACING + (def.flowIn?14:0) + (def.flowOut?14:0));
   }
   return { bw, bh };
 }
 
+/**
+ * Returns the canvas-space position of a port.
+ *
+ * Port layout:
+ *  flowIn  → top center of block
+ *  flowOut → bottom center
+ *  flowExtra_N → bottom center offset right by (N+1)*24
+ *  dataIn_i  → LEFT edge, Y spread evenly through content zone
+ *  dataOut_i → RIGHT edge, Y spread evenly through content zone
+ *
+ * The "content zone" for data ports is the full block height minus
+ * the flow-port exclusion zones (14px at top if flowIn, 14px at bottom if flowOut).
+ */
 function getPortPos(block, portType, idx) {
   const sizeInfo = blockSize(block);
   const def = sizeInfo.def || getBlockDef(block.type);
@@ -406,6 +399,7 @@ function getPortPos(block, portType, idx) {
     return { x: block.x + bw/2 + (ei+1)*26, y: block.y + bh };
   }
 
+  // Data ports — Y spread in content zone
   const topExclude    = (def.flowIn  !== false) ? 14 : 4;
   const bottomExclude = (def.flowOut !== false) ? 14 : 4;
   const contentH = bh - topExclude - bottomExclude;
@@ -452,17 +446,16 @@ function drawBlock(block) {
   const def = sizeInfo.def || getBlockDef(block.type);
   const { bw, bh } = sizeInfo;
   const sel = state.selected?.id === block.id;
-  const isLoopAnchor = block.type === 'loop_start' || block.type === 'loop_end';
 
   // Shadow + body
-  ctx.shadowColor = sel ? def.color+'50' : isLoopAnchor ? 'rgba(255,200,90,0.15)' : 'rgba(0,0,0,0.45)';
-  ctx.shadowBlur  = sel ? 16 : isLoopAnchor ? 10 : 7;
+  ctx.shadowColor = sel ? def.color+'50' : 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur  = sel ? 16 : 7;
   ctx.shadowOffsetY = 2;
   roundRect(ctx, block.x, block.y, bw, bh, 7);
-  ctx.fillStyle = isLoopAnchor ? '#1e1c10' : '#1a1e28';
+  ctx.fillStyle = '#1a1e28';
   ctx.fill();
-  ctx.strokeStyle = sel ? def.color : isLoopAnchor ? 'rgba(255,200,90,0.4)' : '#2a3045';
-  ctx.lineWidth = sel ? 2 : isLoopAnchor ? 1.5 : 1;
+  ctx.strokeStyle = sel ? def.color : '#2a3045';
+  ctx.lineWidth = sel ? 2 : 1;
   ctx.stroke();
   ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
 
@@ -471,7 +464,7 @@ function drawBlock(block) {
   ctx.fillStyle = def.color;
   ctx.fill();
 
-  // Label
+  // Label  ── operators show "a OP b" or "not a"
   ctx.textBaseline = 'middle';
   if (def.cat === 'op') {
     const sym = OP_SYMS[block.type] || def.label;
@@ -500,15 +493,6 @@ function drawBlock(block) {
     }
   }
 
-  // For/while: show double-click hint below label
-  if ((block.type==='for_loop'||block.type==='while_loop') && !sel) {
-    const hasTab = state.tabs.some(t=>t.loopBlock===block.id);
-    ctx.fillStyle = hasTab ? '#ffc85a88' : '#5a647888';
-    ctx.font = '8px JetBrains Mono';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(hasTab ? '⟳ body defined' : '⟳ dbl-click to edit body', block.x + 12, block.y + bh - 10);
-  }
-
   // Flow ports
   if (def.flowIn  !== false) drawFlowPort(...pxy(getPortPos(block,'flowIn',0)),  def.color);
   if (def.flowOut !== false) drawFlowPort(...pxy(getPortPos(block,'flowOut',0)), def.color);
@@ -524,7 +508,7 @@ function drawBlock(block) {
     }
   }
 
-  // Data IN ports
+  // Data IN ports (left edge)
   const dIn = def.ports?.in||[];
   for (let i=0; i<dIn.length; i++) {
     const p = getPortPos(block, 'dataIn', i);
@@ -536,7 +520,7 @@ function drawBlock(block) {
     ctx.fillText(dIn[i].l, block.x + 9, p.y);
   }
 
-  // Data OUT ports
+  // Data OUT ports (right edge)
   const dOut = def.ports?.out||[];
   for (let i=0; i<dOut.length; i++) {
     const p = getPortPos(block, 'dataOut', i);
@@ -549,6 +533,7 @@ function drawBlock(block) {
   }
   ctx.textAlign = 'left';
 
+  // Function call: show fn name below label
   if (def.cat === 'call') {
     ctx.fillStyle = '#5b8fff';
     ctx.font = '9px JetBrains Mono';
@@ -584,6 +569,8 @@ function drawConnection(conn) {
 }
 
 function drawBezier(x1,y1,x2,y2,color,lw) {
+  // For data connections going left→right use horizontal bezier,
+  // for flow connections (top→bottom) use vertical bezier
   const dx = x2-x1, dy = y2-y1;
   const cp = Math.max(40, Math.abs(dy)*0.5, Math.abs(dx)*0.5);
   ctx.beginPath(); ctx.moveTo(x1,y1);
@@ -734,14 +721,7 @@ canvas.addEventListener('contextmenu', e => {
   e.preventDefault();
   const {x:wx,y:wy}=toWorld(e.offsetX,e.offsetY);
   const block=hitBlock(wx,wy);
-  if (block) {
-    state.ctxTarget=block; state.selected=block;
-    // Show "Open Loop Body" only for loop blocks
-    const isLoop=block.type==='for_loop'||block.type==='while_loop';
-    document.getElementById('ctx-open-loop').style.display=isLoop?'flex':'none';
-    document.getElementById('ctx-loop-divider').style.display=isLoop?'block':'none';
-    showCtx(e.clientX,e.clientY); draw();
-  }
+  if (block) { state.ctxTarget=block; state.selected=block; showCtx(e.clientX,e.clientY); draw(); }
 });
 
 canvas.addEventListener('wheel', e => {
@@ -781,34 +761,23 @@ function addBlock(type,x,y) {
 
 /* ══════════════════════════════════════
    LOOP TABS
-   Double-clicking a for/while block opens a dedicated canvas tab
-   for its loop body. The body has LOOP START and LOOP END anchors.
 ══════════════════════════════════════ */
 function openLoopTab(block) {
-  // If a tab already exists for this block, just switch to it
+  // If a tab already exists for this block, switch to it
   const existing = state.tabs.find(t => t.loopBlock === block.id);
   if (existing) { switchTab(existing.id); return; }
 
+  const def = getBlockDef(block.type);
   const label = block.type==='for_loop'
     ? `for ${block.data?.var||'i'}`
     : `while`;
-
   const id = state.nextTabId++;
-  const loopStartId = state.nextBlockId++;
-  const loopEndId   = state.nextBlockId++;
-
-  const newTab = {
+  state.tabs.push({
     id, name: label, isMain:false, isLoop:true, loopBlock:block.id,
     loopType: block.type,
-    blocks:[
-      { id: loopStartId, type:'loop_start', x:230, y:80,  data:{} },
-      { id: loopEndId,   type:'loop_end',   x:230, y:300, data:{} },
-    ],
-    connections:[], localVars:[], params:[], returns:[]
-  };
-  state.tabs.push(newTab);
-  // Center the initial view
-  state.canvasState[id]={ offsetX:0, offsetY:0, scale:1 };
+    blocks:[], connections:[], localVars:[], params:[], returns:[]
+  });
+  state.canvasState[id]={offsetX:60,offsetY:60,scale:1};
   switchTab(id);
 }
 
@@ -827,20 +796,10 @@ function paletteLabel(def) {
 function buildPalette() {
   const scroll=document.getElementById('palette-scroll');
   scroll.innerHTML='';
-
-  const tab = activeTab();
-  const isLoopTab = tab?.isLoop === true;
-
-  // Filter groups: Loop Body only inside loop tabs, Functions group hidden in loop tabs
-  const groups = PALETTE_GROUPS.filter(g => {
-    if (g.title === 'Loop Body')  return isLoopTab;
-    if (g.title === 'Functions')  return !isLoopTab;
-    if (g.title === 'Flow')       return !isLoopTab;   // START/END not needed in loop body
-    return true;
-  }).map(g => ({...g}));
+  const groups=[...PALETTE_GROUPS];
 
   // Function call blocks
-  const fnTabs=state.tabs.filter(t=>!t.isMain&&!t.isLoop);
+  const fnTabs=state.tabs.filter(t=>!t.isMain);
   if (fnTabs.length>0) {
     groups.push({title:'Calls',types:fnTabs.map(t=>'call_fn_'+t.id)});
     for (const ft of fnTabs) {
@@ -850,7 +809,7 @@ function buildPalette() {
         flowIn:true,flowOut:true,extraFlows:[],
         ports:{
           in: ft.params.map(p=>({l:p.name})),
-          out:ft.returns.map(r=>({l:r.name}))
+          out:ft.returns.map(r=>({l:r.name}))  // ← return values as named OUT ports
         },
         fields:[]
       };
@@ -863,6 +822,7 @@ function buildPalette() {
     g.innerHTML=`<div class="palette-group-title">${grp.title}</div>`;
     for (const type of grp.types) {
       const def=getBlockDef(type);
+      // attach type to def so paletteLabel can read it
       def.type=type;
       const el=document.createElement('div');
       el.className='palette-block'; el.draggable=true; el.dataset.type=type;
@@ -886,9 +846,9 @@ function buildTabs() {
   const btnNew=document.getElementById('btn-new-tab');
   for (const tab of state.tabs) {
     const el=document.createElement('div');
-    el.className='tab'+(tab.id===state.activeTab?' active':'')+(tab.isLoop?' loop-tab':'');
+    el.className='tab'+(tab.id===state.activeTab?' active':'');
     el.dataset.tabId=tab.id;
-    const icon = tab.isMain?'⬡': tab.isLoop?'⟳':'ƒ';
+    const icon = tab.isMain?'⬡': tab.isLoop?'↻':'ƒ';
     el.innerHTML=`<span style="font-size:10px;opacity:.6">${icon}</span>
       <span>${tab.name}</span>
       ${!tab.isMain?`<span class="tab-close" data-close="${tab.id}">×</span>`:''}`;
@@ -901,33 +861,8 @@ function buildTabs() {
 }
 
 function switchTab(id){
-  state.activeTab=id;
-  // Show/hide loop context banner
-  const tab = state.tabs.find(t=>t.id===id);
-  const bar = document.getElementById('loop-context-bar');
-  const labelEl = document.getElementById('loop-context-label');
-  if (bar) {
-    if (tab?.isLoop) {
-      bar.style.display = 'flex';
-      // Find the loop block across all tabs
-      let loopBlock = null;
-      for (const t of state.tabs) {
-        loopBlock = t.blocks?.find(b=>b.id===tab.loopBlock);
-        if (loopBlock) break;
-      }
-      if (labelEl) {
-        const iterLabel = tab.loopType==='for_loop'
-          ? `for ${loopBlock?.data?.var||'i'} in [iter]`
-          : `while [cond]`;
-        labelEl.textContent = `Loop body for: ${iterLabel} — connect LOOP START → blocks → LOOP END`;
-      }
-    } else {
-      bar.style.display = 'none';
-    }
-  }
-  buildTabs(); buildSidebar(); buildPalette(); draw();
+  state.activeTab=id; buildTabs(); buildSidebar(); buildPalette(); draw();
 }
-
 function removeTab(id){
   const i=state.tabs.findIndex(t=>t.id===id); if(i<0)return;
   state.tabs.splice(i,1); delete state.canvasState[id]; delete BLOCK_DEFS['call_fn_'+id]; delete BLOCK_DEFS['loop_'+id];
@@ -945,7 +880,7 @@ document.getElementById('fn-cancel').addEventListener('click',()=>document.getEl
 document.getElementById('fn-ok').addEventListener('click',()=>{
   const name=document.getElementById('fn-name-input').value.trim()||'func';
   const id=state.nextTabId++;
-  state.tabs.push({id,name,isMain:false,isLoop:false,blocks:[],connections:[],localVars:[],params:[],returns:[]});
+  state.tabs.push({id,name,isMain:false,blocks:[],connections:[],localVars:[],params:[],returns:[]});
   state.canvasState[id]={offsetX:0,offsetY:0,scale:1};
   document.getElementById('fn-modal').classList.remove('show');
   switchTab(id);
@@ -956,24 +891,9 @@ document.getElementById('fn-ok').addEventListener('click',()=>{
 ══════════════════════════════════════ */
 function buildSidebar(){
   const tab=activeTab();
-  // Update sidebar title based on context
-  const titleEl = document.getElementById('sidebar-title');
-  if (titleEl) {
-    if (tab?.isLoop) {
-      titleEl.textContent = 'Loop Vars';
-      titleEl.style.color = 'var(--accent4)';
-    } else {
-      titleEl.textContent = 'Variables';
-      titleEl.style.color = '';
-    }
-  }
-  // Show loop hint in loop tabs
-  const loopHint = document.getElementById('loop-hint-section');
-  if (loopHint) loopHint.style.display = tab?.isLoop ? '' : 'none';
-
   document.getElementById('fn-vars-section').style.display=(tab?.isMain||tab?.isLoop)?'none':'';
   renderVarList('global-var-list',state.globalVars,'global');
-  if(!tab?.isMain&&!tab?.isLoop&&tab){
+  if(!tab?.isMain&&tab){
     renderVarList('local-var-list',tab.localVars,'local');
     renderVarList('param-list',tab.params,'param');
     renderVarList('return-list',tab.returns,'return');
@@ -1049,15 +969,17 @@ document.getElementById('btn-add-return')?.addEventListener('click',()=>addVar('
 /* ══════════════════════════════════════
    EDIT MODAL
 ══════════════════════════════════════ */
+/** Collect all variable names visible in the current scope */
 function getAllVarNames(){
   const names=new Set();
   state.globalVars.forEach(v=>names.add(v.name));
   const tab=activeTab();
   if(tab&&!tab.isMain){
-    tab.localVars?.forEach(v=>names.add(v.name));
-    tab.params?.forEach(v=>names.add(v.name));
-    tab.returns?.forEach(v=>names.add(v.name));
+    tab.localVars.forEach(v=>names.add(v.name));
+    tab.params.forEach(v=>names.add(v.name));
+    tab.returns.forEach(v=>names.add(v.name));
   }
+  // Also scrape set_var block names from the active canvas
   activeBlocks().filter(b=>b.type==='set_var'||b.type==='list_new'||b.type==='list_append'||b.type==='list_insert'||b.type==='list_del'||b.type==='list_del_end')
     .forEach(b=>{ if(b.data?.name) names.add(b.data.name); });
   return [...names].sort();
@@ -1076,6 +998,7 @@ function openEditModal(block){
   for(const f of (def.fields||[])){
     const lbl=document.createElement('label'); lbl.textContent=f.label;
     if(f.type==='var'){
+      // Combobox: datalist of all in-scope var names, but freely typeable
       const allVars=getAllVarNames();
       const listId='varlist_'+f.k;
       const dl=document.createElement('datalist'); dl.id=listId;
@@ -1106,11 +1029,6 @@ document.getElementById('edit-ok').addEventListener('click',()=>{
 ══════════════════════════════════════ */
 function showCtx(x,y){const m=document.getElementById('ctx-menu');m.style.display='block';m.style.left=x+'px';m.style.top=y+'px';}
 function hideCtx(){document.getElementById('ctx-menu').style.display='none';}
-document.getElementById('ctx-open-loop').addEventListener('click',()=>{
-  if(state.ctxTarget&&(state.ctxTarget.type==='for_loop'||state.ctxTarget.type==='while_loop'))
-    openLoopTab(state.ctxTarget);
-  hideCtx();
-});
 document.getElementById('ctx-edit').addEventListener('click',()=>{if(state.ctxTarget)openEditModal(state.ctxTarget);hideCtx();});
 document.getElementById('ctx-dup').addEventListener('click',()=>{
   if(state.ctxTarget){const nb=JSON.parse(JSON.stringify(state.ctxTarget));nb.id=state.nextBlockId++;nb.x+=24;nb.y+=24;activeBlocks().push(nb);state.selected=nb;draw();}hideCtx();
@@ -1199,7 +1117,7 @@ document.getElementById('chart-input').addEventListener('change', e => {
 
 function saveChart() {
   const payload = {
-    version: 2,
+    version: 1,
     tabs:         state.tabs,
     globalVars:   state.globalVars,
     canvasState:  state.canvasState,
@@ -1235,6 +1153,7 @@ function loadChart(payload) {
   state.dragging = null; state.connecting = null; state.connectingMouse = null;
   state.selected = null; state.ctxTarget = null;
 
+  // Re-parse lib so palette blocks are live (also covers saved libBlockDefs as fallback)
   if (state.libCode) {
     parseLib(state.libCode);
   } else {
@@ -1242,7 +1161,8 @@ function loadChart(payload) {
     for (const def of state.libBlocks) BLOCK_DEFS[def.type] = def;
   }
 
-  for (const ft of state.tabs.filter(t => !t.isMain && !t.isLoop)) {
+  // Rebuild call_fn_* defs from function tabs
+  for (const ft of state.tabs.filter(t => !t.isMain)) {
     const key = 'call_fn_' + ft.id;
     BLOCK_DEFS[key] = {
       label: ft.name, color: '#4af0b0', cat: 'call', compact: false,
@@ -1261,6 +1181,7 @@ function loadChart(payload) {
 
 function parseLib(code){
   state.libBlocks=[];
+  // Split into function blocks so we can inspect each body
   const lines=code.split('\n');
   const fnStarts=[];
   const defRe=/^def\s+(\w+)\s*\(([^)]*)\)/;
@@ -1268,12 +1189,14 @@ function parseLib(code){
 
   fnStarts.forEach((fn,fi)=>{
     const bodyLines=lines.slice(fn.i+1, fnStarts[fi+1]?.i ?? lines.length);
+    // Find return statements; take the last one to determine output count/names
     let outPorts=[{l:'__ret'}];
     for(const bl of bodyLines){
       const rm=bl.match(/^\s+return\s+(.+)/);
       if(!rm) continue;
       const parts=rm[1].split(',').map(s=>s.trim()).filter(Boolean);
       if(parts.length===1){
+        // single return — name it after the function if it's a plain identifier, else __ret
         const ident=parts[0].match(/^[A-Za-z_]\w*$/);
         outPorts=[{l: ident ? '__'+ident[0] : '__ret'}];
       } else {
@@ -1291,6 +1214,11 @@ function parseLib(code){
 
 /* ══════════════════════════════════════
    CODE GENERATION
+   
+   Function return values are now proper named output data ports.
+   When a call block has return values, they are assigned to the
+   variable names of whatever is connected to its output ports,
+   or to the return variable names as fallback.
 ══════════════════════════════════════ */
 document.getElementById('btn-generate').addEventListener('click', generateCode);
 
@@ -1307,12 +1235,13 @@ function generateCode(){
     code+='\n';
   }
 
-  // Function defs (non-loop tabs only)
-  for(const ft of state.tabs.filter(t=>!t.isMain&&!t.isLoop)){
+  // Function defs
+  for(const ft of state.tabs.filter(t=>!t.isMain)){
     const params=ft.params.map(p=>p.name).join(', ');
     code+=`def ${ft.name}(${params}):\n`;
     for(const lv of ft.localVars) code+=ind(1)+`${lv.name} = ${lv.value||'None'}\n`;
     code+=generateFlowCode(ft,1);
+    // Final return of all return vars
     if(ft.returns.length) code+=ind(1)+`return ${ft.returns.map(r=>r.name).join(', ')}\n`;
     code+='\n';
   }
@@ -1329,9 +1258,7 @@ function generateFlowCode(tab,indentLevel){
   let code='';
   const ind=n=>'    '.repeat(n);
 
-  // Find start: prefer explicit start/loop_start block, fall back to first output-only block
   const startBlock=blocks.find(b=>b.type==='start')
-    || blocks.find(b=>b.type==='loop_start')
     || blocks.find(b=>{const d=getBlockDef(b.type);return d.flowIn===false&&d.flowOut!==false;});
 
   const visited=new Set();
@@ -1343,7 +1270,7 @@ function generateFlowCode(tab,indentLevel){
     const il=indentLevel+depth;
 
     switch(block.type){
-      case 'start': case 'end_main': case 'loop_start': case 'loop_end': break;
+      case 'start': case 'end_main': break;
       case 'comment': code+=ind(il)+`# ${block.data?.text||''}\n`; break;
 
       case 'set_var':
@@ -1370,34 +1297,30 @@ function generateFlowCode(tab,indentLevel){
       case 'for_loop':{
         const iter=resolveDataIn(block,0,conns,blocks);
         code+=ind(il)+`for ${block.data?.var||'i'} in ${iter}:\n`;
-        // Prefer loop body tab; fallback to direct flowOut connection
-        const loopTabFor=state.tabs.find(t=>t.loopBlock===block.id);
-        if(loopTabFor){
-          const bodyCode=generateFlowCode(loopTabFor,il+1);
-          code+=bodyCode||ind(il+1)+'pass\n';
+        // Check for loop body tab first, then fall back to direct connection
+        const loopTab=state.tabs.find(t=>t.loopBlock===block.id);
+        if(loopTab){
+          code+=generateFlowCode(loopTab, il+1);
         } else {
           const body=flowNext(block,'flowOut',conns,blocks);
           if(body) followFlow(body,depth+1); else code+=ind(il+1)+'pass\n';
         }
-        // Continue flow after the loop (blocks wired to flowOut on parent canvas
-        // when no loop tab exists, OR always via the "after-loop" continuation)
-        const afterFor=loopTabFor ? flowNext(block,'flowOut',conns,blocks) : null;
-        if(afterFor) followFlow(afterFor,depth);
+        const exit=flowNext(block,'flowExtra_0',conns,blocks);
+        if(exit) followFlow(exit,depth);
         return;
       }
       case 'while_loop':{
         const cond=resolveDataIn(block,0,conns,blocks);
         code+=ind(il)+`while ${cond}:\n`;
-        const loopTabWhile=state.tabs.find(t=>t.loopBlock===block.id);
-        if(loopTabWhile){
-          const bodyCode=generateFlowCode(loopTabWhile,il+1);
-          code+=bodyCode||ind(il+1)+'pass\n';
+        const loopTab=state.tabs.find(t=>t.loopBlock===block.id);
+        if(loopTab){
+          code+=generateFlowCode(loopTab, il+1);
         } else {
           const body=flowNext(block,'flowOut',conns,blocks);
           if(body) followFlow(body,depth+1); else code+=ind(il+1)+'pass\n';
         }
-        const afterWhile=loopTabWhile ? flowNext(block,'flowOut',conns,blocks) : null;
-        if(afterWhile) followFlow(afterWhile,depth);
+        const exit=flowNext(block,'flowExtra_0',conns,blocks);
+        if(exit) followFlow(exit,depth);
         return;
       }
       case 'break_blk':  code+=ind(il)+'break\n'; return;
@@ -1425,6 +1348,8 @@ function generateFlowCode(tab,indentLevel){
           const fnTab=state.tabs.find(t=>t.id===def.fnTab);
           if(fnTab){
             const args=fnTab.params.map((_,i)=>resolveDataIn(block,i,conns,blocks)).join(', ');
+            // Return values: look at what is connected to each dataOut port
+            // If nothing connected, use the return var name as a local capture variable
             const lhsParts=fnTab.returns.map((r,i)=>{
               const dest=resolveDataOut(block,i,conns,blocks);
               return dest||('__'+r.name);
@@ -1436,6 +1361,7 @@ function generateFlowCode(tab,indentLevel){
           const args=(def.ports.in||[]).map((_,i)=>resolveDataIn(block,i,conns,blocks)).join(', ');
           const fnName=def.label.replace('()','');
           const outs=def.ports.out||[];
+          // LHS: prefer what's connected downstream, else use the __name from the port def
           const lhs=outs.length
             ?(outs.map((p,i)=>resolveDataOut(block,i,conns,blocks)||p.l).join(', '))+' = '
             :'';
@@ -1452,11 +1378,10 @@ function generateFlowCode(tab,indentLevel){
 
   followFlow(startBlock,0);
 
-  // Unconnected flow blocks (skip loop anchors — they're structural)
+  // Unconnected flow blocks
   for(const b of blocks){
     if(!visited.has(b.id)){
       const def=getBlockDef(b.type);
-      if(b.type==='loop_start'||b.type==='loop_end') continue;
       if(def.flowIn!==false||def.flowOut!==false) code+=ind(indentLevel)+`# [unconnected: ${def.label}]\n`;
     }
   }
@@ -1470,6 +1395,7 @@ function flowNext(block,portType,conns,blocks){
   return c?blocks.find(b=>b.id===c.toBlock):null;
 }
 
+/** Resolve what value expression feeds into dataIn port idx of a block */
 function resolveDataIn(block,idx,conns,blocks){
   const conn=conns.find(c=>c.toBlock===block.id&&c.toPort==='dataIn'&&c.toIdx===idx);
   if(!conn) return '_';
@@ -1477,14 +1403,18 @@ function resolveDataIn(block,idx,conns,blocks){
   return resolveBlockOutput(src,conn.fromIdx||0,conns,blocks);
 }
 
+/** Resolve the expression a block outputs at output port idx */
 function resolveBlockOutput(block,outIdx,conns,blocks){
+  // List / tuple blocks
   if(block.type==='mux'){
+    // Collect all connected inputs and pack as tuple
     const n=parseInt(block.data?.n||2);
     const items=[];
     for(let i=0;i<n;i++) items.push(resolveDataIn(block,i,conns,blocks));
     return `(${items.join(', ')})`;
   }
   if(block.type==='demux'){
+    // Output port outIdx unpacks element outIdx of the connected tuple
     const src=resolveDataIn(block,0,conns,blocks);
     return `${src}[${outIdx}]`;
   }
@@ -1495,6 +1425,7 @@ function resolveBlockOutput(block,outIdx,conns,blocks){
   if(block.type==='read_var')  return block.data?.name||'var';
   if(def.cat==='op')           return resolveOp(block,conns,blocks);
   if(def.cat==='call'){
+    // output port outIdx corresponds to return value at that index
     const fnTab=state.tabs.find(t=>t.id===def.fnTab);
     if(fnTab&&fnTab.returns[outIdx]) return '__'+fnTab.returns[outIdx].name;
   }
@@ -1505,16 +1436,20 @@ function resolveBlockOutput(block,outIdx,conns,blocks){
   return block.data?.name||'_';
 }
 
+/** What variable name should receive the dataOut port outIdx of block (used for call LHS) */
 function resolveDataOut(block,outIdx,conns,blocks){
+  // Find a set_var block connected to this output, or a read_var, or nothing
   const conn=conns.find(c=>c.fromBlock===block.id&&c.fromPort==='dataOut'&&(c.fromIdx||0)===outIdx);
   if(!conn) return null;
   const dest=blocks.find(b=>b.id===conn.toBlock); if(!dest)return null;
+  const destDef=getBlockDef(dest.type);
   if(dest.type==='set_var') return dest.data?.name||null;
   if(dest.type==='read_var') return dest.data?.name||null;
   return null;
 }
 
 function resolveOp(block,conns,blocks){
+  // Port connection takes priority; fall back to edited literal value, then '_'
   const aConn=conns.find(c=>c.toBlock===block.id&&c.toPort==='dataIn'&&c.toIdx===0);
   const bConn=conns.find(c=>c.toBlock===block.id&&c.toPort==='dataIn'&&c.toIdx===1);
   const aSrc=aConn?blocks.find(b=>b.id===aConn.fromBlock):null;
