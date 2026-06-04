@@ -1068,10 +1068,11 @@ function draw() {
     if (state.connecting && state.connectingMouse) {
         const p = getPortPos(state.connecting.block, state.connecting.portType, state.connecting.idx || 0);
         const m = state.connectingMouse;
-        drawBezier(p.x, p.y, m.x, m.y, state.connecting.isFlow ? '#5b8fff99' : '#c97bff99', 1.5);
+		drawBezier([p, m], state.connecting.isFlow ? '#5b8fff99' : '#c97bff99', 1.5);
     }
 
     for (const block of activeBlocks()) drawBlock(block);
+    ctx.restore();
     ctx.restore();
 }
 
@@ -1236,11 +1237,8 @@ function drawConnection(conn) {
     const lw = sel ? (isFlow ? 3.5 : 3) : (isFlow ? 2 : 1.5);
 
     const pts = [from, ...(conn.waypoints || []), to];
-    for (let i = 0; i < pts.length - 1; i++) {
-        drawBezier(pts[i].x, pts[i].y, pts[i+1].x, pts[i+1].y, color, lw);
-    }
+    drawBezier(pts, color, lw);
 
-    // Draw waypoint handles on hover or select
     if ((hovered || sel) && conn.waypoints) {
         for (const wp of conn.waypoints) {
             ctx.beginPath();
@@ -1254,12 +1252,36 @@ function drawConnection(conn) {
     }
 }
 
-function drawBezier(x1, y1, x2, y2, color, lw) {
-    const dx = x2 - x1, dy = y2 - y1;
-    const cp = Math.max(40, Math.abs(dy) * 0.5, Math.abs(dx) * 0.5);
+// Draws a uniform cubic B-spline through all points as one continuous path
+function drawBezier(pts, color, lw) {
+    if (pts.length < 2) return;
+    if (pts.some(p => isNaN(p.x) || isNaN(p.y))) return;
+
+    const p = [pts[0], pts[0], ...pts, pts[pts.length - 1], pts[pts.length - 1]];
+
     ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.bezierCurveTo(x1 + cp * Math.sign(dx || 1), y1, x2 - cp * Math.sign(dx || 1), y2, x2, y2);
+    ctx.moveTo(pts[0].x, pts[0].y);
+
+    for (let i = 1; i < p.length - 2; i++) {
+        for (let t = 0; t <= 1; t += 0.05) {
+            const t2 = t * t, t3 = t2 * t;
+            const x = 0.5 * (
+                (2 * p[i].x) +
+                (-p[i-1].x + p[i+1].x) * t +
+                (2*p[i-1].x - 5*p[i].x + 4*p[i+1].x - p[i+2].x) * t2 +
+                (-p[i-1].x + 3*p[i].x - 3*p[i+1].x + p[i+2].x) * t3
+            );
+            const y = 0.5 * (
+                (2 * p[i].y) +
+                (-p[i-1].y + p[i+1].y) * t +
+                (2*p[i-1].y - 5*p[i].y + 4*p[i+1].y - p[i+2].y) * t2 +
+                (-p[i-1].y + 3*p[i].y - 3*p[i+1].y + p[i+2].y) * t3
+            );
+            ctx.lineTo(x, y);
+        }
+    }
+
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
     ctx.strokeStyle = color;
     ctx.lineWidth = lw;
     ctx.stroke();
@@ -1366,12 +1388,20 @@ function hitConnection(wx, wy) {
         const from = getPortPos(fb, conn.fromPort, conn.fromIdx || 0);
         const to   = getPortPos(tb, conn.toPort,   conn.toIdx   || 0);
         const pts  = [from, ...(conn.waypoints || []), to];
-        for (let j = 0; j < pts.length - 1; j++) {
-            if (pointNearBezier(wx, wy, pts[j].x, pts[j].y, pts[j+1].x, pts[j+1].y, 8))
-                return { conn, segIdx: j };
-        }
+		if (pointNearBezier(wx, wy, pts, 8)) return { conn, segIdx: nearestSegIdx(wx, wy, pts) }
     }
     return null;
+}
+
+function nearestSegIdx(px, py, pts) {
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < pts.length - 1; i++) {
+        const mx = (pts[i].x + pts[i+1].x) / 2;
+        const my = (pts[i].y + pts[i+1].y) / 2;
+        const d = Math.hypot(px - mx, py - my);
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
 }
 
 function hitWaypoint(wx, wy, conn) {
@@ -1382,16 +1412,29 @@ function hitWaypoint(wx, wy, conn) {
     return -1;
 }
 
-function pointNearBezier(px, py, x1, y1, x2, y2, threshold) {
-    const dx = x2 - x1, dy = y2 - y1;
-    const cp = Math.max(40, Math.abs(dy) * 0.5, Math.abs(dx) * 0.5);
-    const cx1 = x1 + cp * Math.sign(dx || 1), cy1 = y1;
-    const cx2 = x2 - cp * Math.sign(dx || 1), cy2 = y2;
-    for (let t = 0; t <= 1; t += 0.02) {
-        const u = 1 - t;
-        const bx = u*u*u*x1 + 3*u*u*t*cx1 + 3*u*t*t*cx2 + t*t*t*x2;
-        const by = u*u*u*y1 + 3*u*u*t*cy1 + 3*u*t*t*cy2 + t*t*t*y2;
-        if (Math.hypot(px - bx, py - by) < threshold) return true;
+function pointNearBezier(px, py, pts, threshold) {
+    if (pts.length < 2) return false;
+    if (pts.some(p => isNaN(p.x) || isNaN(p.y))) return false;
+
+    const p = [pts[0], pts[0], ...pts, pts[pts.length - 1], pts[pts.length - 1]];
+
+    for (let i = 1; i < p.length - 2; i++) {
+        for (let t = 0; t <= 1; t += 0.02) {
+            const t2 = t * t, t3 = t2 * t;
+            const x = 0.5 * (
+                (2 * p[i].x) +
+                (-p[i-1].x + p[i+1].x) * t +
+                (2*p[i-1].x - 5*p[i].x + 4*p[i+1].x - p[i+2].x) * t2 +
+                (-p[i-1].x + 3*p[i].x - 3*p[i+1].x + p[i+2].x) * t3
+            );
+            const y = 0.5 * (
+                (2 * p[i].y) +
+                (-p[i-1].y + p[i+1].y) * t +
+                (2*p[i-1].y - 5*p[i].y + 4*p[i+1].y - p[i+2].y) * t2 +
+                (-p[i-1].y + 3*p[i].y - 3*p[i+1].y + p[i+2].y) * t3
+            );
+            if (Math.hypot(px - x, py - y) < threshold) return true;
+        }
     }
     return false;
 }
@@ -1431,6 +1474,7 @@ canvas.addEventListener('mousedown', e => {
     }
 
     // Waypoint drag or insertion on hovered wire
+	console.log('hoveredConn:', state.hoveredConn, 'hitConn:', hitConnection(wx, wy));
     if (state.hoveredConn) {
         const wpIdx = hitWaypoint(wx, wy, state.hoveredConn);
         if (wpIdx !== -1) {
