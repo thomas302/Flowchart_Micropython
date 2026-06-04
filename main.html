@@ -246,9 +246,9 @@ const state = {
 
 // Block width constants
 const BW_NORMAL  = 170;  // flow/control/misc/func blocks
-const BW_COMPACT = 130;  // value, op, data blocks
+const BW_COMPACT = 80;   // value, op, data blocks — intentionally narrow
 const BH_NORMAL  = 46;
-const BH_COMPACT = 36;
+const BH_COMPACT = 32;
 const PORT_R     = 6;
 const FLOW_R     = 7;
 const PORT_SPACING = 18; // px between data ports vertically
@@ -274,19 +274,19 @@ const BLOCK_DEFS = {
   read_var:   { label:'Read',    color:'#c97bff', cat:'value',   compact:true,  flowIn:false, flowOut:false, extraFlows:[], ports:{in:[],out:[{l:'val'}]}, fields:[{k:'name',label:'Var',default:'x'}] },
   set_var:    { label:'Set',     color:'#c97bff', cat:'value',   compact:false, flowIn:true,  flowOut:true,  extraFlows:[], ports:{in:[{l:'val'}],out:[]}, fields:[{k:'name',label:'Var',default:'x'}] },
   data_blk:   { label:'Data',    color:'#c97bff', cat:'value',   compact:true,  flowIn:false, flowOut:false, extraFlows:[], ports:{in:[],out:[{l:'val'}]}, fields:[{k:'value',label:'Val',default:'0'}] },
-  // OPERATORS — compact, no flow
-  op_add:     { label:'+',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_sub:     { label:'−',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_mul:     { label:'×',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_div:     { label:'÷',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_mod:     { label:'%',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_eq:      { label:'==',      color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_neq:     { label:'!=',      color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_lt:      { label:'<',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_gt:      { label:'>',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_and:     { label:'and',     color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_or:      { label:'or',      color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[] },
-  op_not:     { label:'not',     color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'}],out:[{l:'res'}]},fields:[] },
+  // OPERATORS — compact, no flow; a/b are editable literal fallbacks
+  op_add:     { label:'+',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_sub:     { label:'−',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_mul:     { label:'×',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_div:     { label:'÷',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_mod:     { label:'%',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_eq:      { label:'==',      color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_neq:     { label:'!=',      color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_lt:      { label:'<',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_gt:      { label:'>',       color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_and:     { label:'and',     color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_or:      { label:'or',      color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'},{l:'b'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'},{k:'b',label:'b',default:'_'}] },
+  op_not:     { label:'not',     color:'#5b8fff', cat:'op', compact:true, flowIn:false,flowOut:false,extraFlows:[],ports:{in:[{l:'a'}],out:[{l:'res'}]},fields:[{k:'a',label:'a',default:'_'}] },
   // MISC
   delay:      { label:'Delay',   color:'#ff9f43', cat:'misc',    compact:false, flowIn:true,  flowOut:true,  extraFlows:[], ports:{in:[{l:'ms'}],out:[]}, fields:[{k:'ms',label:'ms',default:'1000'}] },
   print_blk:  { label:'Print',   color:'#ff9f43', cat:'misc',    compact:false, flowIn:true,  flowOut:true,  extraFlows:[], ports:{in:[{l:'val'}],out:[]}, fields:[] },
@@ -444,15 +444,12 @@ function drawBlock(block) {
   ctx.textBaseline = 'middle';
   if (def.cat === 'op') {
     const sym = OP_SYMS[block.type] || def.label;
-    let displayLabel;
-    if (block.type === 'op_not') {
-      displayLabel = `not  a`;
-    } else {
-      displayLabel = `a  ${sym}  b`;
-    }
+    const va = block.data?.a || 'a';
+    const vb = block.data?.b || 'b';
+    const displayLabel = block.type === 'op_not' ? `not ${va}` : `${va} ${sym} ${vb}`;
     ctx.fillStyle = def.color;
-    ctx.font = `600 12px 'JetBrains Mono', monospace`;
-    ctx.fillText(displayLabel, block.x + 13, block.y + bh/2);
+    ctx.font = `600 11px 'JetBrains Mono', monospace`;
+    ctx.fillText(displayLabel, block.x + 10, block.y + bh/2);
   } else {
     ctx.fillStyle = def.color;
     ctx.font = `600 11px 'Syne', sans-serif`;
@@ -923,7 +920,12 @@ document.getElementById('btn-add-return')?.addEventListener('click',()=>addVar('
 let editTarget=null;
 function openEditModal(block){
   const def=getBlockDef(block.type); editTarget=block;
-  document.getElementById('edit-modal-title').textContent='Edit: '+def.label;
+  const opTitle = def.cat==='op'
+    ? (block.type==='op_not'
+        ? `not ${block.data?.a||'a'}`
+        : `${block.data?.a||'a'} ${OP_SYMS[block.type]||def.label} ${block.data?.b||'b'}`)
+    : def.label;
+  document.getElementById('edit-modal-title').textContent='Edit: '+opTitle;
   const body=document.getElementById('edit-modal-body'); body.innerHTML='';
   if(!(def.fields||[]).length) body.innerHTML='<p style="color:var(--text3);font-size:11px">No editable fields.</p>';
   for(const f of (def.fields||[])){
@@ -1086,7 +1088,7 @@ function loadChart(payload) {
       flowIn: true, flowOut: true, extraFlows: [],
       ports: {
         in:  ft.params.map(p => ({ l: p.name })),
-        out: ft.returns.map(r => ({ l: r.name })),
+        out: ft.returns.map(r => ({ l: '__'+r.name })),
       },
       fields: [],
     };
@@ -1097,16 +1099,35 @@ function loadChart(payload) {
 
 function parseLib(code){
   state.libBlocks=[];
-  const re=/^def\s+(\w+)\s*\(([^)]*)\)/gm;
-  let m;
-  while((m=re.exec(code))!==null){
-    const name=m[1], args=m[2].split(',').map(a=>a.trim()).filter(Boolean);
-    const type='lib_'+name;
-    const def={type,label:name+'()',color:'#ff9f43',cat:'lib',compact:false,flowIn:true,flowOut:true,extraFlows:[],
-               ports:{in:args.map(a=>({l:a.split('=')[0].trim()})),out:[{l:'ret'}]},fields:[]};
+  // Split into function blocks so we can inspect each body
+  const lines=code.split('\n');
+  const fnStarts=[];
+  const defRe=/^def\s+(\w+)\s*\(([^)]*)\)/;
+  lines.forEach((ln,i)=>{ const m=ln.match(defRe); if(m) fnStarts.push({i,name:m[1],args:m[2]}); });
+
+  fnStarts.forEach((fn,fi)=>{
+    const bodyLines=lines.slice(fn.i+1, fnStarts[fi+1]?.i ?? lines.length);
+    // Find return statements; take the last one to determine output count/names
+    let outPorts=[{l:'__ret'}];
+    for(const bl of bodyLines){
+      const rm=bl.match(/^\s+return\s+(.+)/);
+      if(!rm) continue;
+      const parts=rm[1].split(',').map(s=>s.trim()).filter(Boolean);
+      if(parts.length===1){
+        // single return — name it after the function if it's a plain identifier, else __ret
+        const ident=parts[0].match(/^[A-Za-z_]\w*$/);
+        outPorts=[{l: ident ? '__'+ident[0] : '__ret'}];
+      } else {
+        outPorts=parts.map((p,i)=>{ const id=p.match(/^[A-Za-z_]\w*$/); return {l: id?'__'+id[0]:'__ret'+i}; });
+      }
+    }
+    const args=fn.args.split(',').map(a=>a.trim()).filter(Boolean);
+    const type='lib_'+fn.name;
+    const def={type,label:fn.name+'()',color:'#ff9f43',cat:'lib',compact:false,flowIn:true,flowOut:true,extraFlows:[],
+               ports:{in:args.map(a=>({l:a.split('=')[0].trim()})),out:outPorts},fields:[]};
     BLOCK_DEFS[type]=def;
     state.libBlocks.push(def);
-  }
+  });
 }
 
 /* ══════════════════════════════════════
@@ -1221,7 +1242,7 @@ function generateFlowCode(tab,indentLevel){
             // If nothing connected, use the return var name as a local capture variable
             const lhsParts=fnTab.returns.map((r,i)=>{
               const dest=resolveDataOut(block,i,conns,blocks);
-              return dest||r.name;
+              return dest||('__'+r.name);
             });
             const lhs=lhsParts.length?lhsParts.join(', ')+' = ':'';
             code+=ind(il)+`${lhs}${fnTab.name}(${args})\n`;
@@ -1230,7 +1251,10 @@ function generateFlowCode(tab,indentLevel){
           const args=(def.ports.in||[]).map((_,i)=>resolveDataIn(block,i,conns,blocks)).join(', ');
           const fnName=def.label.replace('()','');
           const outs=def.ports.out||[];
-          const lhs=outs.length?(outs.map((_,i)=>resolveDataOut(block,i,conns,blocks)||'_').join(', '))+' = ':'';
+          // LHS: prefer what's connected downstream, else use the __name from the port def
+          const lhs=outs.length
+            ?(outs.map((p,i)=>resolveDataOut(block,i,conns,blocks)||p.l).join(', '))+' = '
+            :'';
           code+=ind(il)+`${lhs}${fnName}(${args})\n`;
         }
     }
@@ -1278,9 +1302,12 @@ function resolveBlockOutput(block,outIdx,conns,blocks){
   if(def.cat==='call'){
     // output port outIdx corresponds to return value at that index
     const fnTab=state.tabs.find(t=>t.id===def.fnTab);
-    if(fnTab&&fnTab.returns[outIdx]) return fnTab.returns[outIdx].name;
+    if(fnTab&&fnTab.returns[outIdx]) return '__'+fnTab.returns[outIdx].name;
   }
-  if(def.cat==='lib') return def.label.replace('()','')+'_ret';
+  if(def.cat==='lib'){
+    const outPort=(def.ports.out||[])[outIdx];
+    return outPort?outPort.l : def.label.replace('()','')+'__ret';
+  }
   return block.data?.name||'_';
 }
 
@@ -1297,8 +1324,13 @@ function resolveDataOut(block,outIdx,conns,blocks){
 }
 
 function resolveOp(block,conns,blocks){
-  const a=resolveDataIn(block,0,conns,blocks);
-  const b=resolveDataIn(block,1,conns,blocks);
+  // Port connection takes priority; fall back to edited literal value, then '_'
+  const aConn=conns.find(c=>c.toBlock===block.id&&c.toPort==='dataIn'&&c.toIdx===0);
+  const bConn=conns.find(c=>c.toBlock===block.id&&c.toPort==='dataIn'&&c.toIdx===1);
+  const aSrc=aConn?blocks.find(b=>b.id===aConn.fromBlock):null;
+  const bSrc=bConn?blocks.find(b=>b.id===bConn.fromBlock):null;
+  const a=aSrc?resolveBlockOutput(aSrc,aConn.fromIdx||0,conns,blocks):(block.data?.a||'_');
+  const b=bSrc?resolveBlockOutput(bSrc,bConn.fromIdx||0,conns,blocks):(block.data?.b||'_');
   const pyOps={op_add:'+',op_sub:'-',op_mul:'*',op_div:'/',op_mod:'%',
                op_eq:'==',op_neq:'!=',op_lt:'<',op_gt:'>',op_and:'and',op_or:'or'};
   if(block.type==='op_not') return `not ${a}`;
